@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Candle, TimeRange } from '../types'
 import { getCandles } from '../api/finnhub'
-import { TIME_RANGES, getCacheTTL } from '../utils/timeRanges'
-import { nowUnix } from '../api/helpers'
+import { TIME_RANGES } from '../utils/timeRanges'
 
 export function useCandles(symbol: string | null, range: TimeRange) {
   const [candles, setCandles] = useState<Candle[]>([])
@@ -20,10 +19,8 @@ export function useCandles(symbol: string | null, range: TimeRange) {
     setError(null)
 
     const config = TIME_RANGES[range]
-    const from = config.getFrom()
-    const to = nowUnix()
 
-    getCandles(symbol, config.resolution, from, to)
+    getCandles(symbol, config.range, config.interval)
       .then(data => {
         if (!cancelled) {
           setCandles(data)

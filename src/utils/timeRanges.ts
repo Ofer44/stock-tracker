@@ -1,27 +1,14 @@
 import type { TimeRange, TimeRangeConfig } from '../types'
 
-function nowUnix(): number {
-  return Math.floor(Date.now() / 1000)
-}
-
-function daysAgo(days: number): number {
-  return nowUnix() - days * 86400
-}
-
-function startOfYear(): number {
-  const now = new Date()
-  return Math.floor(new Date(now.getFullYear(), 0, 1).getTime() / 1000)
-}
-
 export const TIME_RANGES: Record<TimeRange, TimeRangeConfig> = {
-  '1D': { resolution: '5', getFrom: () => daysAgo(1) },
-  '1W': { resolution: '15', getFrom: () => daysAgo(7) },
-  '1M': { resolution: '60', getFrom: () => daysAgo(30) },
-  '3M': { resolution: 'D', getFrom: () => daysAgo(90) },
-  'YTD': { resolution: 'D', getFrom: () => startOfYear() },
-  '1Y': { resolution: 'D', getFrom: () => daysAgo(365) },
-  '2Y': { resolution: 'W', getFrom: () => daysAgo(730) },
-  'Max': { resolution: 'M', getFrom: () => daysAgo(365 * 20) },
+  '1D': { range: '1d', interval: '5m' },
+  '1W': { range: '5d', interval: '15m' },
+  '1M': { range: '1mo', interval: '1h' },
+  '3M': { range: '3mo', interval: '1d' },
+  'YTD': { range: 'ytd', interval: '1d' },
+  '1Y': { range: '1y', interval: '1d' },
+  '2Y': { range: '2y', interval: '1wk' },
+  'Max': { range: 'max', interval: '1mo' },
 }
 
 export const TIME_RANGE_LABELS: TimeRange[] = ['1D', '1W', '1M', '3M', 'YTD', '1Y', '2Y', 'Max']
