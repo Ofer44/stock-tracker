@@ -8,7 +8,7 @@ const DEFAULT_WATCHLIST: WatchlistItem[] = [
   { symbol: 'MSFT', displaySymbol: 'MSFT', name: 'Microsoft Corp', type: 'stock' },
   { symbol: 'GOOGL', displaySymbol: 'GOOGL', name: 'Alphabet Inc', type: 'stock' },
   { symbol: 'AMZN', displaySymbol: 'AMZN', name: 'Amazon.com Inc', type: 'stock' },
-  { symbol: 'EURUSD=X', displaySymbol: 'EUR/USD', name: 'Euro / US Dollar', type: 'forex' },
+  { symbol: 'EUR/USD', displaySymbol: 'EUR/USD', name: 'Euro / US Dollar', type: 'forex' },
 ]
 
 function loadWatchlist(): WatchlistItem[] {

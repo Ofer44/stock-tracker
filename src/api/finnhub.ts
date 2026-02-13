@@ -2,6 +2,11 @@ import { FINNHUB_API_KEY, FINNHUB_BASE_URL } from '../config'
 import type { Quote, Candle, SearchResult } from '../types'
 import { getCached, setCache } from './helpers'
 
+const TWELVE_DATA_KEY = 'demo'
+const TWELVE_DATA_BASE = 'https://api.twelvedata.com'
+
+// ── Finnhub helpers ──
+
 async function fetchFinnhub<T>(endpoint: string, params: Record<string, string>): Promise<T> {
   const url = new URL(`${FINNHUB_BASE_URL}${endpoint}`)
   url.searchParams.set('token', FINNHUB_API_KEY)
@@ -17,9 +22,17 @@ async function fetchFinnhub<T>(endpoint: string, params: Record<string, string>)
 
 // ── Quotes (Finnhub — works on free tier) ──
 
+function toFinnhubSymbol(symbol: string): string {
+  // Convert Twelve Data forex format (EUR/USD) to Finnhub (OANDA:EUR_USD)
+  const forexMatch = symbol.match(/^([A-Z]{3})\/([A-Z]{3})$/)
+  if (forexMatch) {
+    return `OANDA:${forexMatch[1]}_${forexMatch[2]}`
+  }
+  return symbol
+}
+
 export async function getQuote(symbol: string): Promise<Quote> {
-  // For forex symbols like EURUSD=X, convert to Finnhub format for quote
-  const finnhubSymbol = yahooToFinnhubSymbol(symbol)
+  const finnhubSymbol = toFinnhubSymbol(symbol)
   const cacheKey = `quote:${finnhubSymbol}`
   const cached = getCached<Quote>(cacheKey, 30_000)
   if (cached) return cached
@@ -29,72 +42,55 @@ export async function getQuote(symbol: string): Promise<Quote> {
   return data
 }
 
-function yahooToFinnhubSymbol(symbol: string): string {
-  // Convert Yahoo forex format (EURUSD=X) to Finnhub format (OANDA:EUR_USD)
-  const forexMatch = symbol.match(/^([A-Z]{3})([A-Z]{3})=X$/)
-  if (forexMatch) {
-    return `OANDA:${forexMatch[1]}_${forexMatch[2]}`
-  }
-  return symbol
-}
+// ── Chart data (Twelve Data — free, CORS-friendly) ──
 
-// ── Chart data (Yahoo Finance — free, no key needed) ──
-
-interface YahooChartResponse {
-  chart: {
-    result: Array<{
-      timestamp: number[]
-      indicators: {
-        quote: Array<{
-          open: (number | null)[]
-          high: (number | null)[]
-          low: (number | null)[]
-          close: (number | null)[]
-          volume: (number | null)[]
-        }>
-      }
-    }> | null
-    error: { description: string } | null
-  }
+interface TwelveDataResponse {
+  values?: Array<{
+    datetime: string
+    open: string
+    high: string
+    low: string
+    close: string
+    volume?: string
+  }>
+  status: string
+  message?: string
 }
 
 export async function getCandles(
   symbol: string,
-  range: string,
   interval: string,
+  outputsize: number,
 ): Promise<Candle[]> {
-  const cacheKey = `candles:${symbol}:${range}:${interval}`
+  const cacheKey = `candles:${symbol}:${interval}:${outputsize}`
   const cached = getCached<Candle[]>(cacheKey, 60_000)
   if (cached) return cached
 
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`
-  const res = await fetch(url)
+  const url = new URL(`${TWELVE_DATA_BASE}/time_series`)
+  url.searchParams.set('symbol', symbol)
+  url.searchParams.set('interval', interval)
+  url.searchParams.set('outputsize', outputsize.toString())
+  url.searchParams.set('apikey', TWELVE_DATA_KEY)
+
+  const res = await fetch(url.toString())
   if (!res.ok) {
-    throw new Error(`Yahoo Finance error: ${res.status}`)
+    throw new Error(`Twelve Data error: ${res.status}`)
   }
 
-  const data: YahooChartResponse = await res.json()
-  if (!data.chart.result || data.chart.result.length === 0) return []
+  const data: TwelveDataResponse = await res.json()
+  if (data.status !== 'ok' || !data.values) return []
 
-  const result = data.chart.result[0]
-  const timestamps = result.timestamp
-  const quote = result.indicators.quote[0]
-
-  if (!timestamps || !quote) return []
-
-  const candles: Candle[] = []
-  for (let i = 0; i < timestamps.length; i++) {
-    const close = quote.close[i]
-    if (close == null) continue
-    candles.push({
-      time: timestamps[i],
-      open: quote.open[i] ?? close,
-      high: quote.high[i] ?? close,
-      low: quote.low[i] ?? close,
-      close,
-      volume: quote.volume[i] ?? 0,
-    })
-  }
+  // Twelve Data returns newest first — reverse for chart
+  const candles: Candle[] = data.values
+    .map(v => ({
+      time: Math.floor(new Date(v.datetime).getTime() / 1000),
+      open: parseFloat(v.open),
+      high: parseFloat(v.high),
+      low: parseFloat(v.low),
+      close: parseFloat(v.close),
+      volume: v.volume ? parseInt(v.volume, 10) : 0,
+    }))
+    .reverse()
 
   setCache(cacheKey, candles)
   return candles
@@ -115,14 +111,14 @@ export async function searchSymbol(query: string): Promise<SearchResult[]> {
   return results
 }
 
-// ── Static forex pairs (Yahoo Finance format) ──
+// ── Static forex pairs (Twelve Data format: BASE/QUOTE) ──
 
 export const FOREX_PAIRS: { symbol: string; displaySymbol: string; name: string }[] = [
-  { symbol: 'EURUSD=X', displaySymbol: 'EUR/USD', name: 'Euro / US Dollar' },
-  { symbol: 'GBPUSD=X', displaySymbol: 'GBP/USD', name: 'British Pound / US Dollar' },
-  { symbol: 'JPY=X', displaySymbol: 'USD/JPY', name: 'US Dollar / Japanese Yen' },
-  { symbol: 'CHF=X', displaySymbol: 'USD/CHF', name: 'US Dollar / Swiss Franc' },
-  { symbol: 'AUDUSD=X', displaySymbol: 'AUD/USD', name: 'Australian Dollar / US Dollar' },
-  { symbol: 'CAD=X', displaySymbol: 'USD/CAD', name: 'US Dollar / Canadian Dollar' },
-  { symbol: 'NZDUSD=X', displaySymbol: 'NZD/USD', name: 'New Zealand Dollar / US Dollar' },
+  { symbol: 'EUR/USD', displaySymbol: 'EUR/USD', name: 'Euro / US Dollar' },
+  { symbol: 'GBP/USD', displaySymbol: 'GBP/USD', name: 'British Pound / US Dollar' },
+  { symbol: 'USD/JPY', displaySymbol: 'USD/JPY', name: 'US Dollar / Japanese Yen' },
+  { symbol: 'USD/CHF', displaySymbol: 'USD/CHF', name: 'US Dollar / Swiss Franc' },
+  { symbol: 'AUD/USD', displaySymbol: 'AUD/USD', name: 'Australian Dollar / US Dollar' },
+  { symbol: 'USD/CAD', displaySymbol: 'USD/CAD', name: 'US Dollar / Canadian Dollar' },
+  { symbol: 'NZD/USD', displaySymbol: 'NZD/USD', name: 'New Zealand Dollar / US Dollar' },
 ]

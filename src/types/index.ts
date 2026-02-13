@@ -45,8 +45,8 @@ export interface WatchlistItem {
 export type TimeRange = '1D' | '1W' | '1M' | '3M' | 'YTD' | '1Y' | '2Y' | 'Max'
 
 export interface TimeRangeConfig {
-  range: string     // Yahoo Finance range param (e.g. '3mo')
-  interval: string  // Yahoo Finance interval param (e.g. '1d')
+  interval: string    // Twelve Data interval (e.g. '1day', '5min')
+  outputsize: number  // Number of data points to fetch
 }
 
 export interface CacheEntry<T> {

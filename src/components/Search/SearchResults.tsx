@@ -10,7 +10,7 @@ interface SearchResultsProps {
 }
 
 function inferType(result: SearchResult): WatchlistItem['type'] {
-  if (result.symbol.endsWith('=X') || result.type === 'Forex') return 'forex'
+  if (/^[A-Z]{3}\/[A-Z]{3}$/.test(result.symbol) || result.type === 'Forex') return 'forex'
   return 'stock'
 }
 

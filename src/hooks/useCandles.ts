@@ -20,7 +20,7 @@ export function useCandles(symbol: string | null, range: TimeRange) {
 
     const config = TIME_RANGES[range]
 
-    getCandles(symbol, config.range, config.interval)
+    getCandles(symbol, config.interval, config.outputsize)
       .then(data => {
         if (!cancelled) {
           setCandles(data)
